@@ -1,0 +1,761 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    
+    <!-- Primary Meta Tags -->
+    <title>My Account | Uber Padel</title>
+    <meta name="description" content="View your player profile, verification status, and registered competitions on Uber Padel.">
+    <meta name="robots" content="noindex, nofollow">
+    
+    <!-- Favicon -->
+    <link rel="icon" type="image/x-icon" href="favicon.ico">
+    <link rel="icon" type="image/svg+xml" href="uberpadel-icon.svg">
+    <link rel="apple-touch-icon" href="uberpadel-icon-512.png">
+    
+    <!-- Theme -->
+    <meta name="theme-color" content="#2563EB">
+    
+    <!-- Preconnect hints -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link rel="preconnect" href="https://stretford-padel-tournament-default-rtdb.europe-west1.firebasedatabase.app" crossorigin>
+    
+    <!-- Google Fonts -->
+    <link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;600;700&display=swap" rel="stylesheet">
+    
+    <!-- Tailwind CSS -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    
+    <!-- Firebase SDKs -->
+    <script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-app-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-database-compat.js"></script>
+    
+    <style>
+        * {
+            -webkit-font-smoothing: antialiased;
+            -moz-osx-font-smoothing: grayscale;
+        }
+        
+        body {
+            font-family: 'Space Grotesk', -apple-system, BlinkMacSystemFont, sans-serif;
+        }
+        
+        @keyframes fadeInUp {
+            from {
+                opacity: 0;
+                transform: translateY(20px);
+            }
+            to {
+                opacity: 1;
+                transform: translateY(0);
+            }
+        }
+        
+        @keyframes pulse {
+            0%, 100% { opacity: 1; }
+            50% { opacity: 0.5; }
+        }
+        
+        .animate-fade-in-up {
+            animation: fadeInUp 0.5s ease-out forwards;
+        }
+        
+        .animate-pulse {
+            animation: pulse 2s ease-in-out infinite;
+        }
+        
+        .status-badge {
+            display: inline-flex;
+            align-items: center;
+            gap: 6px;
+            padding: 6px 12px;
+            border-radius: 9999px;
+            font-size: 14px;
+            font-weight: 600;
+        }
+        
+        .status-pending {
+            background: #FEF3C7;
+            color: #92400E;
+        }
+        
+        .status-verified {
+            background: #D1FAE5;
+            color: #065F46;
+        }
+        
+        .status-rejected {
+            background: #FEE2E2;
+            color: #991B1B;
+        }
+        
+        .competition-card {
+            transition: all 0.2s ease;
+        }
+        
+        .competition-card:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 8px 25px -5px rgba(0, 0, 0, 0.1);
+        }
+    </style>
+</head>
+<body class="bg-gradient-to-br from-slate-50 via-blue-50 to-indigo-50 min-h-screen">
+    
+    <!-- Navigation -->
+    <nav class="bg-white/80 backdrop-blur-md border-b border-gray-100 sticky top-0 z-50">
+        <div class="max-w-6xl mx-auto px-4 py-4">
+            <div class="flex items-center justify-between">
+                <a href="index.html" class="flex items-center gap-3">
+                    <img src="uberpadel-icon.svg" alt="Uber Padel" class="w-10 h-10">
+                    <span class="font-bold text-xl text-gray-800">Uber Padel</span>
+                </a>
+                <div class="flex items-center gap-4">
+                    <a href="competitions.html" class="text-gray-600 hover:text-blue-600 font-medium transition-colors">Competitions</a>
+                    <a href="my-account.html" class="text-blue-600 font-semibold">My Account</a>
+                </div>
+            </div>
+        </div>
+    </nav>
+    
+    <!-- Loading State -->
+    <div id="loading-state" class="max-w-4xl mx-auto px-4 py-12">
+        <div class="bg-white rounded-3xl shadow-xl p-8 text-center">
+            <div class="animate-pulse">
+                <div class="w-24 h-24 bg-gray-200 rounded-full mx-auto mb-6"></div>
+                <div class="h-8 bg-gray-200 rounded-lg w-48 mx-auto mb-4"></div>
+                <div class="h-4 bg-gray-200 rounded w-32 mx-auto"></div>
+            </div>
+        </div>
+    </div>
+    
+    <!-- Not Registered State -->
+    <div id="not-registered" class="hidden max-w-xl mx-auto px-4 py-12">
+        <div class="bg-white rounded-3xl shadow-xl p-8 text-center animate-fade-in-up">
+            <div class="w-20 h-20 bg-gray-100 rounded-full flex items-center justify-center mx-auto mb-6">
+                <span class="text-4xl">👤</span>
+            </div>
+            <h1 class="text-2xl font-bold text-gray-800 mb-2">No Account Found</h1>
+            <p class="text-gray-600 mb-6">You haven't registered as a player yet. Register to join competitions!</p>
+            <a href="register.html" class="inline-block px-8 py-3 bg-blue-600 hover:bg-blue-700 text-white rounded-xl font-semibold transition-colors">
+                Register Now
+            </a>
+            
+            <div class="mt-8 pt-6 border-t border-gray-100">
+                <p class="text-sm text-gray-500 mb-3">Already registered on another device?</p>
+                <button onclick="showRecoverModal()" class="text-blue-600 hover:underline font-medium text-sm">
+                    Recover My Account
+                </button>
+            </div>
+        </div>
+    </div>
+    
+    <!-- Main Dashboard -->
+    <main id="dashboard" class="hidden max-w-4xl mx-auto px-4 py-8">
+        
+        <!-- Profile Header -->
+        <div class="bg-white rounded-3xl shadow-xl p-8 mb-6 animate-fade-in-up">
+            <div class="flex flex-col md:flex-row md:items-center gap-6">
+                <!-- Avatar -->
+                <div class="w-24 h-24 bg-gradient-to-br from-blue-500 to-purple-600 rounded-full flex items-center justify-center text-white text-3xl font-bold flex-shrink-0">
+                    <span id="avatar-initial">?</span>
+                </div>
+                
+                <!-- Info -->
+                <div class="flex-1">
+                    <div class="flex flex-wrap items-center gap-3 mb-2">
+                        <h1 class="text-2xl font-bold text-gray-800" id="player-name">Loading...</h1>
+                        <span id="status-badge" class="status-badge status-pending">
+                            <span class="w-2 h-2 rounded-full bg-current"></span>
+                            Pending
+                        </span>
+                    </div>
+                    
+                    <div class="flex flex-wrap items-center gap-4 text-gray-600 text-sm">
+                        <span class="flex items-center gap-1">
+                            <span>📧</span>
+                            <span id="player-email">-</span>
+                        </span>
+                        <span class="flex items-center gap-1">
+                            <span>🎾</span>
+                            <span>@<span id="player-playtomic">-</span></span>
+                        </span>
+                    </div>
+                    
+                    <!-- Level Badge (shown when verified) -->
+                    <div id="level-container" class="hidden mt-4">
+                        <div class="inline-flex items-center gap-2 bg-gradient-to-r from-blue-500 to-purple-500 text-white px-4 py-2 rounded-xl">
+                            <span class="text-lg">⭐</span>
+                            <span class="font-semibold">Level: <span id="player-level">-</span></span>
+                        </div>
+                    </div>
+                </div>
+                
+                <!-- Player ID -->
+                <div class="text-right">
+                    <div class="text-xs text-gray-400 mb-1">Player ID</div>
+                    <div class="font-mono text-sm font-bold text-gray-600" id="player-id">-</div>
+                </div>
+            </div>
+        </div>
+        
+        <!-- Status Messages -->
+        <div id="pending-message" class="hidden bg-amber-50 border border-amber-200 rounded-2xl p-6 mb-6 animate-fade-in-up" style="animation-delay: 0.1s;">
+            <div class="flex gap-4">
+                <span class="text-2xl">⏳</span>
+                <div>
+                    <h3 class="font-semibold text-amber-800 mb-1">Awaiting Verification</h3>
+                    <p class="text-amber-700 text-sm">
+                        An admin will verify your Playtomic profile and assign your skill level. 
+                        This usually takes 24-48 hours. Once verified, you'll be able to join competitions.
+                    </p>
+                </div>
+            </div>
+        </div>
+        
+        <div id="rejected-message" class="hidden bg-red-50 border border-red-200 rounded-2xl p-6 mb-6 animate-fade-in-up" style="animation-delay: 0.1s;">
+            <div class="flex gap-4">
+                <span class="text-2xl">❌</span>
+                <div>
+                    <h3 class="font-semibold text-red-800 mb-1">Verification Unsuccessful</h3>
+                    <p class="text-red-700 text-sm" id="rejection-reason">
+                        Your registration could not be verified. Please contact an admin for more information.
+                    </p>
+                </div>
+            </div>
+        </div>
+        
+        <!-- Verified Content -->
+        <div id="verified-content" class="hidden">
+            
+            <!-- Quick Stats -->
+            <div class="grid grid-cols-2 md:grid-cols-4 gap-4 mb-6 animate-fade-in-up" style="animation-delay: 0.15s;">
+                <div class="bg-white rounded-2xl p-5 shadow-sm">
+                    <div class="text-3xl mb-2">🏆</div>
+                    <div class="text-2xl font-bold text-gray-800" id="stat-competitions">0</div>
+                    <div class="text-sm text-gray-500">Competitions</div>
+                </div>
+                <div class="bg-white rounded-2xl p-5 shadow-sm">
+                    <div class="text-3xl mb-2">✅</div>
+                    <div class="text-2xl font-bold text-gray-800" id="stat-registered">0</div>
+                    <div class="text-sm text-gray-500">Registered</div>
+                </div>
+                <div class="bg-white rounded-2xl p-5 shadow-sm">
+                    <div class="text-3xl mb-2">📅</div>
+                    <div class="text-2xl font-bold text-gray-800" id="stat-upcoming">0</div>
+                    <div class="text-sm text-gray-500">Upcoming</div>
+                </div>
+                <div class="bg-white rounded-2xl p-5 shadow-sm">
+                    <div class="text-3xl mb-2">⭐</div>
+                    <div class="text-2xl font-bold text-blue-600" id="stat-level">-</div>
+                    <div class="text-sm text-gray-500">Your Level</div>
+                </div>
+            </div>
+            
+            <!-- Available Competitions -->
+            <div class="bg-white rounded-3xl shadow-xl p-6 mb-6 animate-fade-in-up" style="animation-delay: 0.2s;">
+                <div class="flex items-center justify-between mb-6">
+                    <h2 class="text-xl font-bold text-gray-800">🎯 Available Competitions</h2>
+                    <a href="competitions.html" class="text-blue-600 hover:underline text-sm font-medium">View All →</a>
+                </div>
+                
+                <div id="available-competitions" class="space-y-4">
+                    <div class="text-center py-8 text-gray-400">
+                        <div class="animate-pulse">Loading competitions...</div>
+                    </div>
+                </div>
+            </div>
+            
+            <!-- My Registrations -->
+            <div class="bg-white rounded-3xl shadow-xl p-6 animate-fade-in-up" style="animation-delay: 0.25s;">
+                <h2 class="text-xl font-bold text-gray-800 mb-6">📋 My Registrations</h2>
+                
+                <div id="my-registrations" class="space-y-4">
+                    <div class="text-center py-8 text-gray-400">
+                        <p>You haven't registered for any competitions yet.</p>
+                        <a href="competitions.html" class="text-blue-600 hover:underline text-sm font-medium mt-2 inline-block">Browse Competitions →</a>
+                    </div>
+                </div>
+            </div>
+        </div>
+        
+        <!-- Account Actions -->
+        <div class="mt-8 pt-6 border-t border-gray-200 animate-fade-in-up" style="animation-delay: 0.3s;">
+            <div class="flex flex-wrap gap-4 justify-between items-center">
+                <div class="text-sm text-gray-500">
+                    Registered: <span id="registered-date">-</span>
+                </div>
+                <div class="flex gap-3">
+                    <button onclick="showRecoverModal()" class="text-gray-500 hover:text-gray-700 text-sm font-medium">
+                        Link to Another Device
+                    </button>
+                    <button onclick="confirmLogout()" class="text-red-500 hover:text-red-700 text-sm font-medium">
+                        Logout
+                    </button>
+                </div>
+            </div>
+        </div>
+        
+    </main>
+    
+    <!-- Recover Account Modal -->
+    <div id="recover-modal" class="hidden fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center z-50 p-4">
+        <div class="bg-white rounded-3xl shadow-2xl max-w-md w-full overflow-hidden animate-fade-in-up">
+            <div class="bg-gradient-to-r from-blue-600 to-purple-600 px-6 py-5">
+                <h2 class="text-xl font-bold text-white">🔑 Recover Account</h2>
+            </div>
+            <div class="p-6">
+                <p class="text-gray-600 mb-4">Enter your email or Player ID to recover your account on this device.</p>
+                
+                <div class="space-y-4">
+                    <div>
+                        <label class="block text-sm font-semibold text-gray-700 mb-2">Email or Player ID</label>
+                        <input type="text" id="recover-input"
+                            class="w-full px-4 py-3 border-2 border-gray-200 rounded-xl focus:border-blue-500 focus:outline-none"
+                            placeholder="your@email.com or abc12345" />
+                    </div>
+                    
+                    <div id="recover-error" class="hidden bg-red-50 border border-red-200 rounded-xl p-3">
+                        <p class="text-sm text-red-600">Account not found. Please check and try again.</p>
+                    </div>
+                    
+                    <div class="flex gap-3">
+                        <button onclick="closeRecoverModal()" class="flex-1 px-5 py-3 bg-gray-100 hover:bg-gray-200 text-gray-700 rounded-xl font-medium transition-colors">
+                            Cancel
+                        </button>
+                        <button onclick="recoverAccount()" class="flex-1 px-5 py-3 bg-blue-600 hover:bg-blue-700 text-white rounded-xl font-semibold transition-colors">
+                            Recover
+                        </button>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+    
+    <!-- Toast Container -->
+    <div id="toast-container" class="fixed bottom-4 right-4 z-50 flex flex-col gap-2"></div>
+    
+    <script>
+        // ===== FIREBASE CONFIG =====
+        const firebaseConfig = {
+            apiKey: "AIzaSyDYIlRS_me7sy7ptNmRrvPQCeXP2H-hHzU",
+            authDomain: "stretford-padel-tournament.firebaseapp.com",
+            databaseURL: "https://stretford-padel-tournament-default-rtdb.europe-west1.firebasedatabase.app",
+            projectId: "stretford-padel-tournament",
+            storageBucket: "stretford-padel-tournament.firebasestorage.app",
+            messagingSenderId: "596263602058",
+            appId: "1:596263602058:web:f69f7f8d00c60abbd0aa73"
+        };
+        
+        firebase.initializeApp(firebaseConfig);
+        const database = firebase.database();
+        
+        // ===== CONSTANTS =====
+        const PLAYER_STORAGE_KEY = 'uberpadel_player_id';
+        const PLAYERS_DB_PATH = 'players';
+        const COMPETITIONS_DB_PATH = 'competitions';
+        
+        // ===== STATE =====
+        let currentPlayer = null;
+        let playerId = null;
+        
+        // ===== UTILITY FUNCTIONS =====
+        
+        function getStoredPlayerId() {
+            return localStorage.getItem(PLAYER_STORAGE_KEY);
+        }
+        
+        function setStoredPlayerId(id) {
+            localStorage.setItem(PLAYER_STORAGE_KEY, id);
+        }
+        
+        function clearStoredPlayerId() {
+            localStorage.removeItem(PLAYER_STORAGE_KEY);
+        }
+        
+        function showToast(message, type = 'info') {
+            const container = document.getElementById('toast-container');
+            const toast = document.createElement('div');
+            const bgColor = type === 'error' ? 'bg-red-600' : type === 'success' ? 'bg-green-600' : 'bg-gray-800';
+            toast.className = `${bgColor} text-white px-4 py-3 rounded-xl shadow-lg animate-fade-in-up`;
+            toast.textContent = message;
+            container.appendChild(toast);
+            
+            setTimeout(() => {
+                toast.style.opacity = '0';
+                toast.style.transition = 'opacity 0.3s';
+                setTimeout(() => toast.remove(), 300);
+            }, 3000);
+        }
+        
+        function formatDate(isoString) {
+            if (!isoString) return '-';
+            const date = new Date(isoString);
+            return date.toLocaleDateString('en-GB', { 
+                day: 'numeric', 
+                month: 'short', 
+                year: 'numeric' 
+            });
+        }
+        
+        function formatLevel(level) {
+            if (level === null || level === undefined) return '-';
+            return parseFloat(level).toFixed(2);
+        }
+        
+        // ===== PAGE LOGIC =====
+        
+        async function loadPlayerData() {
+            playerId = getStoredPlayerId();
+            
+            if (!playerId) {
+                showNotRegistered();
+                return;
+            }
+            
+            try {
+                const snapshot = await database.ref(`${PLAYERS_DB_PATH}/${playerId}`).once('value');
+                
+                if (!snapshot.exists()) {
+                    showNotRegistered();
+                    return;
+                }
+                
+                currentPlayer = snapshot.val();
+                currentPlayer.id = playerId;
+                
+                renderDashboard();
+                
+            } catch (error) {
+                console.error('Error loading player data:', error);
+                showToast('Error loading account data', 'error');
+            }
+        }
+        
+        function showNotRegistered() {
+            document.getElementById('loading-state').classList.add('hidden');
+            document.getElementById('not-registered').classList.remove('hidden');
+        }
+        
+        function renderDashboard() {
+            document.getElementById('loading-state').classList.add('hidden');
+            document.getElementById('dashboard').classList.remove('hidden');
+            
+            // Basic info
+            document.getElementById('player-name').textContent = currentPlayer.name;
+            document.getElementById('avatar-initial').textContent = currentPlayer.name.charAt(0).toUpperCase();
+            document.getElementById('player-email').textContent = currentPlayer.email;
+            document.getElementById('player-playtomic').textContent = currentPlayer.playtomicUsername;
+            document.getElementById('player-id').textContent = currentPlayer.id.toUpperCase();
+            document.getElementById('registered-date').textContent = formatDate(currentPlayer.registeredAt);
+            
+            // Status
+            const statusBadge = document.getElementById('status-badge');
+            const pendingMessage = document.getElementById('pending-message');
+            const rejectedMessage = document.getElementById('rejected-message');
+            const verifiedContent = document.getElementById('verified-content');
+            const levelContainer = document.getElementById('level-container');
+            
+            statusBadge.className = 'status-badge';
+            pendingMessage.classList.add('hidden');
+            rejectedMessage.classList.add('hidden');
+            verifiedContent.classList.add('hidden');
+            levelContainer.classList.add('hidden');
+            
+            switch (currentPlayer.status) {
+                case 'pending':
+                    statusBadge.classList.add('status-pending');
+                    statusBadge.innerHTML = '<span class="w-2 h-2 rounded-full bg-current animate-pulse"></span> Pending Verification';
+                    pendingMessage.classList.remove('hidden');
+                    break;
+                    
+                case 'verified':
+                    statusBadge.classList.add('status-verified');
+                    statusBadge.innerHTML = '<span class="w-2 h-2 rounded-full bg-current"></span> Verified';
+                    verifiedContent.classList.remove('hidden');
+                    levelContainer.classList.remove('hidden');
+                    document.getElementById('player-level').textContent = formatLevel(currentPlayer.playtomicLevel);
+                    document.getElementById('stat-level').textContent = formatLevel(currentPlayer.playtomicLevel);
+                    loadCompetitions();
+                    break;
+                    
+                case 'rejected':
+                    statusBadge.classList.add('status-rejected');
+                    statusBadge.innerHTML = '<span class="w-2 h-2 rounded-full bg-current"></span> Rejected';
+                    rejectedMessage.classList.remove('hidden');
+                    if (currentPlayer.rejectionReason) {
+                        document.getElementById('rejection-reason').textContent = currentPlayer.rejectionReason;
+                    }
+                    break;
+            }
+        }
+        
+        async function loadCompetitions() {
+            if (!currentPlayer || currentPlayer.status !== 'verified') return;
+            
+            const playerLevel = parseFloat(currentPlayer.playtomicLevel);
+            
+            try {
+                const snapshot = await database.ref(COMPETITIONS_DB_PATH).once('value');
+                const competitions = [];
+                
+                snapshot.forEach((child) => {
+                    const comp = child.val();
+                    comp.id = child.key;
+                    
+                    // Only show open competitions
+                    if (comp.meta && comp.meta.status === 'registration') {
+                        competitions.push(comp);
+                    }
+                });
+                
+                // Filter by level eligibility
+                const eligible = competitions.filter(c => {
+                    const min = parseFloat(c.meta.minLevel) || 0;
+                    const max = parseFloat(c.meta.maxLevel) || 10;
+                    return playerLevel >= min && playerLevel <= max;
+                });
+                
+                renderAvailableCompetitions(eligible);
+                renderMyRegistrations(competitions);
+                
+            } catch (error) {
+                console.error('Error loading competitions:', error);
+            }
+        }
+        
+        function renderAvailableCompetitions(competitions) {
+            const container = document.getElementById('available-competitions');
+            
+            if (competitions.length === 0) {
+                container.innerHTML = `
+                    <div class="text-center py-8 text-gray-400">
+                        <div class="text-4xl mb-2">🔍</div>
+                        <p>No competitions available for your level right now.</p>
+                        <a href="competitions.html" class="text-blue-600 hover:underline text-sm font-medium mt-2 inline-block">View All Competitions →</a>
+                    </div>
+                `;
+                return;
+            }
+            
+            // Show up to 3 competitions
+            const toShow = competitions.slice(0, 3);
+            
+            container.innerHTML = toShow.map(comp => {
+                const meta = comp.meta;
+                const registered = comp.registeredPlayers && comp.registeredPlayers[playerId];
+                const spotsLeft = meta.maxPlayers - Object.keys(comp.registeredPlayers || {}).length;
+                
+                return `
+                    <div class="competition-card bg-gray-50 rounded-2xl p-5 border border-gray-100">
+                        <div class="flex items-start justify-between gap-4">
+                            <div class="flex-1">
+                                <h3 class="font-semibold text-gray-800 mb-1">${meta.name}</h3>
+                                <div class="flex flex-wrap gap-2 text-sm text-gray-500">
+                                    <span class="bg-white px-2 py-1 rounded-lg">${meta.format || 'Tournament'}</span>
+                                    <span class="bg-white px-2 py-1 rounded-lg">Level ${formatLevel(meta.minLevel)}-${formatLevel(meta.maxLevel)}</span>
+                                    <span class="bg-white px-2 py-1 rounded-lg">${spotsLeft} spots left</span>
+                                </div>
+                            </div>
+                            ${registered ? `
+                                <span class="px-4 py-2 bg-green-100 text-green-700 rounded-xl text-sm font-semibold">
+                                    ✓ Registered
+                                </span>
+                            ` : `
+                                <button onclick="registerForCompetition('${comp.id}')" 
+                                    class="px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-xl text-sm font-semibold transition-colors">
+                                    Register
+                                </button>
+                            `}
+                        </div>
+                    </div>
+                `;
+            }).join('');
+        }
+        
+        function renderMyRegistrations(allCompetitions) {
+            const container = document.getElementById('my-registrations');
+            
+            // Find competitions where this player is registered
+            const myComps = allCompetitions.filter(c => 
+                c.registeredPlayers && c.registeredPlayers[playerId]
+            );
+            
+            // Update stats
+            document.getElementById('stat-registered').textContent = myComps.length;
+            document.getElementById('stat-upcoming').textContent = myComps.filter(c => 
+                c.meta.status === 'registration' || c.meta.status === 'closed'
+            ).length;
+            
+            if (myComps.length === 0) {
+                container.innerHTML = `
+                    <div class="text-center py-8 text-gray-400">
+                        <p>You haven't registered for any competitions yet.</p>
+                        <a href="competitions.html" class="text-blue-600 hover:underline text-sm font-medium mt-2 inline-block">Browse Competitions →</a>
+                    </div>
+                `;
+                return;
+            }
+            
+            container.innerHTML = myComps.map(comp => {
+                const meta = comp.meta;
+                const statusColors = {
+                    'registration': 'bg-green-100 text-green-700',
+                    'closed': 'bg-amber-100 text-amber-700',
+                    'active': 'bg-blue-100 text-blue-700',
+                    'completed': 'bg-gray-100 text-gray-600'
+                };
+                const statusLabels = {
+                    'registration': 'Open',
+                    'closed': 'Starting Soon',
+                    'active': 'In Progress',
+                    'completed': 'Completed'
+                };
+                
+                return `
+                    <div class="competition-card bg-gray-50 rounded-2xl p-5 border border-gray-100">
+                        <div class="flex items-start justify-between gap-4">
+                            <div class="flex-1">
+                                <h3 class="font-semibold text-gray-800 mb-1">${meta.name}</h3>
+                                <div class="flex flex-wrap gap-2 text-sm text-gray-500">
+                                    <span class="bg-white px-2 py-1 rounded-lg">${meta.format || 'Tournament'}</span>
+                                    <span class="bg-white px-2 py-1 rounded-lg">📅 ${formatDate(meta.startDate)}</span>
+                                </div>
+                            </div>
+                            <span class="px-3 py-1 ${statusColors[meta.status] || 'bg-gray-100 text-gray-600'} rounded-lg text-sm font-medium">
+                                ${statusLabels[meta.status] || meta.status}
+                            </span>
+                        </div>
+                    </div>
+                `;
+            }).join('');
+        }
+        
+        async function registerForCompetition(competitionId) {
+            if (!currentPlayer || currentPlayer.status !== 'verified') {
+                showToast('You must be verified to register', 'error');
+                return;
+            }
+            
+            try {
+                // Get competition data
+                const snapshot = await database.ref(`${COMPETITIONS_DB_PATH}/${competitionId}`).once('value');
+                const comp = snapshot.val();
+                
+                if (!comp) {
+                    showToast('Competition not found', 'error');
+                    return;
+                }
+                
+                // Check capacity
+                const registered = Object.keys(comp.registeredPlayers || {}).length;
+                if (registered >= comp.meta.maxPlayers) {
+                    showToast('Competition is full', 'error');
+                    return;
+                }
+                
+                // Check level eligibility
+                const playerLevel = parseFloat(currentPlayer.playtomicLevel);
+                const minLevel = parseFloat(comp.meta.minLevel) || 0;
+                const maxLevel = parseFloat(comp.meta.maxLevel) || 10;
+                
+                if (playerLevel < minLevel || playerLevel > maxLevel) {
+                    showToast(`Your level (${formatLevel(playerLevel)}) is outside the range (${formatLevel(minLevel)}-${formatLevel(maxLevel)})`, 'error');
+                    return;
+                }
+                
+                // Register player
+                await database.ref(`${COMPETITIONS_DB_PATH}/${competitionId}/registeredPlayers/${playerId}`).set({
+                    registeredAt: new Date().toISOString(),
+                    name: currentPlayer.name,
+                    level: currentPlayer.playtomicLevel
+                });
+                
+                showToast('Successfully registered!', 'success');
+                loadCompetitions(); // Refresh
+                
+            } catch (error) {
+                console.error('Error registering:', error);
+                showToast('Registration failed', 'error');
+            }
+        }
+        
+        // ===== MODAL FUNCTIONS =====
+        
+        function showRecoverModal() {
+            document.getElementById('recover-modal').classList.remove('hidden');
+            document.getElementById('recover-error').classList.add('hidden');
+            document.getElementById('recover-input').value = '';
+            setTimeout(() => document.getElementById('recover-input').focus(), 100);
+        }
+        
+        function closeRecoverModal() {
+            document.getElementById('recover-modal').classList.add('hidden');
+        }
+        
+        async function recoverAccount() {
+            const input = document.getElementById('recover-input').value.trim().toLowerCase();
+            
+            if (!input) {
+                document.getElementById('recover-error').classList.remove('hidden');
+                return;
+            }
+            
+            try {
+                let foundId = null;
+                
+                // Check if it's a player ID (8 chars alphanumeric)
+                if (/^[a-z0-9]{8}$/.test(input)) {
+                    const snapshot = await database.ref(`${PLAYERS_DB_PATH}/${input}`).once('value');
+                    if (snapshot.exists()) {
+                        foundId = input;
+                    }
+                }
+                
+                // If not found, search by email
+                if (!foundId) {
+                    const snapshot = await database.ref(PLAYERS_DB_PATH)
+                        .orderByChild('email')
+                        .equalTo(input)
+                        .once('value');
+                    
+                    snapshot.forEach((child) => {
+                        foundId = child.key;
+                    });
+                }
+                
+                if (foundId) {
+                    setStoredPlayerId(foundId);
+                    closeRecoverModal();
+                    showToast('Account recovered!', 'success');
+                    loadPlayerData();
+                } else {
+                    document.getElementById('recover-error').classList.remove('hidden');
+                }
+                
+            } catch (error) {
+                console.error('Error recovering account:', error);
+                document.getElementById('recover-error').classList.remove('hidden');
+            }
+        }
+        
+        function confirmLogout() {
+            if (confirm('Are you sure you want to logout? You can recover your account later with your email or Player ID.')) {
+                clearStoredPlayerId();
+                window.location.reload();
+            }
+        }
+        
+        // Close modal on backdrop click
+        document.getElementById('recover-modal').addEventListener('click', (e) => {
+            if (e.target === e.currentTarget) {
+                closeRecoverModal();
+            }
+        });
+        
+        // ===== INITIALIZE =====
+        document.addEventListener('DOMContentLoaded', loadPlayerData);
+    </script>
+</body>
+</html>
