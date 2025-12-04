@@ -184,10 +184,14 @@
                     </div>
                     
                     <!-- Level Badge (shown when verified) -->
-                    <div id="level-container" class="hidden mt-4">
+                    <div id="level-container" class="hidden mt-4 flex flex-wrap gap-2">
                         <div class="inline-flex items-center gap-2 bg-gradient-to-r from-blue-500 to-purple-500 text-white px-4 py-2 rounded-xl">
                             <span class="text-lg">⭐</span>
                             <span class="font-semibold">Level: <span id="player-level">-</span></span>
+                        </div>
+                        <div id="organiser-badge" class="hidden inline-flex items-center gap-2 bg-gradient-to-r from-purple-500 to-pink-500 text-white px-4 py-2 rounded-xl">
+                            <span class="text-lg">👑</span>
+                            <span class="font-semibold">Organiser</span>
                         </div>
                     </div>
                 </div>
@@ -228,6 +232,22 @@
         
         <!-- Verified Content -->
         <div id="verified-content" class="hidden">
+            
+            <!-- Organiser Tools (shown only for organisers) -->
+            <div id="organiser-tools" class="hidden bg-gradient-to-r from-purple-600 to-pink-600 rounded-3xl shadow-xl p-6 mb-6 animate-fade-in-up" style="animation-delay: 0.12s;">
+                <div class="flex flex-col md:flex-row md:items-center md:justify-between gap-4">
+                    <div class="text-white">
+                        <h2 class="text-xl font-bold flex items-center gap-2">
+                            <span>👑</span> Organiser Tools
+                        </h2>
+                        <p class="text-purple-100 text-sm mt-1">Create and manage competitions for your community</p>
+                    </div>
+                    <button onclick="showCreateCompetitionModal()" 
+                        class="px-6 py-3 bg-white hover:bg-gray-100 text-purple-700 rounded-xl font-semibold transition-colors shadow-lg">
+                        + Create Competition
+                    </button>
+                </div>
+            </div>
             
             <!-- Quick Stats -->
             <div class="grid grid-cols-2 md:grid-cols-4 gap-4 mb-6 animate-fade-in-up" style="animation-delay: 0.15s;">
@@ -477,6 +497,13 @@
                     levelContainer.classList.remove('hidden');
                     document.getElementById('player-level').textContent = formatLevel(currentPlayer.playtomicLevel);
                     document.getElementById('stat-level').textContent = formatLevel(currentPlayer.playtomicLevel);
+                    
+                    // Show organiser badge and tools if player is an organiser
+                    if (currentPlayer.isOrganiser) {
+                        document.getElementById('organiser-badge').classList.remove('hidden');
+                        document.getElementById('organiser-tools').classList.remove('hidden');
+                    }
+                    
                     loadCompetitions();
                     break;
                     
@@ -753,6 +780,167 @@
                 closeRecoverModal();
             }
         });
+        
+        // ===== ORGANISER: CREATE COMPETITION =====
+        
+        function showCreateCompetitionModal() {
+            if (!currentPlayer || !currentPlayer.isOrganiser) {
+                showToast('You need to be an organiser to create competitions', 'error');
+                return;
+            }
+            
+            const modal = document.createElement('div');
+            modal.id = 'create-competition-modal';
+            modal.className = 'fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center z-50 p-4 overflow-y-auto';
+            modal.innerHTML = `
+                <div class="bg-white rounded-3xl shadow-2xl max-w-lg w-full my-8 animate-fade-in-up">
+                    <div class="bg-gradient-to-r from-purple-600 to-pink-600 px-6 py-5 rounded-t-3xl">
+                        <h2 class="text-xl font-bold text-white">🏆 Create Competition</h2>
+                    </div>
+                    <div class="p-6">
+                        <div class="space-y-4">
+                            <div>
+                                <label class="block text-sm font-semibold text-gray-700 mb-1">Competition Name *</label>
+                                <input type="text" id="comp-name" 
+                                    class="w-full px-4 py-3 border-2 border-gray-200 rounded-xl focus:border-purple-500 focus:outline-none" 
+                                    placeholder="e.g., Saturday Americano" maxlength="100" />
+                            </div>
+                            
+                            <div>
+                                <label class="block text-sm font-semibold text-gray-700 mb-1">Description</label>
+                                <textarea id="comp-description" rows="2" 
+                                    class="w-full px-4 py-3 border-2 border-gray-200 rounded-xl focus:border-purple-500 focus:outline-none resize-none" 
+                                    placeholder="Optional description..."></textarea>
+                            </div>
+                            
+                            <div class="grid grid-cols-2 gap-4">
+                                <div>
+                                    <label class="block text-sm font-semibold text-gray-700 mb-1">Format *</label>
+                                    <select id="comp-format" class="w-full px-4 py-3 border-2 border-gray-200 rounded-xl focus:border-purple-500 focus:outline-none">
+                                        <option value="americano">Americano</option>
+                                        <option value="mexicano">Mexicano</option>
+                                        <option value="mix">Mix Tournament</option>
+                                        <option value="team-league">Team League</option>
+                                    </select>
+                                </div>
+                                <div>
+                                    <label class="block text-sm font-semibold text-gray-700 mb-1">Max Players *</label>
+                                    <input type="number" id="comp-max-players" value="16" min="4" max="100" 
+                                        class="w-full px-4 py-3 border-2 border-gray-200 rounded-xl focus:border-purple-500 focus:outline-none" />
+                                </div>
+                            </div>
+                            
+                            <div class="grid grid-cols-2 gap-4">
+                                <div>
+                                    <label class="block text-sm font-semibold text-gray-700 mb-1">Min Level *</label>
+                                    <input type="number" id="comp-min-level" step="0.01" min="0" max="10" value="0.00" 
+                                        class="w-full px-4 py-3 border-2 border-gray-200 rounded-xl focus:border-purple-500 focus:outline-none" />
+                                </div>
+                                <div>
+                                    <label class="block text-sm font-semibold text-gray-700 mb-1">Max Level *</label>
+                                    <input type="number" id="comp-max-level" step="0.01" min="0" max="10" value="10.00" 
+                                        class="w-full px-4 py-3 border-2 border-gray-200 rounded-xl focus:border-purple-500 focus:outline-none" />
+                                </div>
+                            </div>
+                            
+                            <div class="grid grid-cols-2 gap-4">
+                                <div>
+                                    <label class="block text-sm font-semibold text-gray-700 mb-1">Start Date *</label>
+                                    <input type="date" id="comp-start-date" 
+                                        class="w-full px-4 py-3 border-2 border-gray-200 rounded-xl focus:border-purple-500 focus:outline-none" />
+                                </div>
+                                <div>
+                                    <label class="block text-sm font-semibold text-gray-700 mb-1">Registration Deadline</label>
+                                    <input type="date" id="comp-deadline" 
+                                        class="w-full px-4 py-3 border-2 border-gray-200 rounded-xl focus:border-purple-500 focus:outline-none" />
+                                </div>
+                            </div>
+                        </div>
+                        
+                        <div class="flex gap-3 mt-6">
+                            <button onclick="closeCreateCompetitionModal()" class="flex-1 py-3 bg-gray-100 hover:bg-gray-200 text-gray-700 rounded-xl font-medium transition-colors">
+                                Cancel
+                            </button>
+                            <button onclick="createCompetition()" class="flex-1 py-3 bg-purple-600 hover:bg-purple-700 text-white rounded-xl font-semibold transition-colors">
+                                Create Competition
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            `;
+            document.body.appendChild(modal);
+            
+            modal.addEventListener('click', (e) => {
+                if (e.target === modal) closeCreateCompetitionModal();
+            });
+            
+            setTimeout(() => document.getElementById('comp-name')?.focus(), 100);
+        }
+        
+        function closeCreateCompetitionModal() {
+            const modal = document.getElementById('create-competition-modal');
+            if (modal) modal.remove();
+        }
+        
+        function generateCompetitionId() {
+            const chars = 'abcdefghijklmnopqrstuvwxyz0123456789';
+            let id = 'comp_';
+            for (let i = 0; i < 8; i++) {
+                id += chars.charAt(Math.floor(Math.random() * chars.length));
+            }
+            return id;
+        }
+        
+        async function createCompetition() {
+            const name = document.getElementById('comp-name').value.trim();
+            const description = document.getElementById('comp-description').value.trim();
+            const format = document.getElementById('comp-format').value;
+            const maxPlayers = parseInt(document.getElementById('comp-max-players').value);
+            const minLevel = parseFloat(document.getElementById('comp-min-level').value);
+            const maxLevel = parseFloat(document.getElementById('comp-max-level').value);
+            const startDate = document.getElementById('comp-start-date').value;
+            const deadline = document.getElementById('comp-deadline').value;
+            
+            if (!name || !startDate) {
+                showToast('Please fill in required fields', 'error');
+                return;
+            }
+            
+            if (minLevel >= maxLevel) {
+                showToast('Max level must be greater than min level', 'error');
+                return;
+            }
+            
+            try {
+                const competitionId = generateCompetitionId();
+                
+                await database.ref(`${COMPETITIONS_DB_PATH}/${competitionId}`).set({
+                    meta: {
+                        name: name,
+                        description: description || null,
+                        format: format,
+                        maxPlayers: maxPlayers,
+                        minLevel: minLevel,
+                        maxLevel: maxLevel,
+                        startDate: startDate,
+                        registrationDeadline: deadline || null,
+                        status: 'registration',
+                        createdAt: new Date().toISOString(),
+                        createdBy: currentPlayer.id,
+                        createdByName: currentPlayer.name
+                    },
+                    registeredPlayers: {}
+                });
+                
+                closeCreateCompetitionModal();
+                showToast('Competition created!', 'success');
+                loadCompetitions(); // Refresh the list
+                
+            } catch (error) {
+                console.error('Error creating competition:', error);
+                showToast('Failed to create competition', 'error');
+            }
+        }
         
         // ===== INITIALIZE =====
         document.addEventListener('DOMContentLoaded', loadPlayerData);

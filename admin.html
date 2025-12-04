@@ -706,6 +706,7 @@
                                     <div class="flex items-center gap-2 mb-1">
                                         <h3 class="font-semibold text-gray-800">${escapeHtml(player.name || 'Unknown')}</h3>
                                         <span class="text-xs px-2 py-0.5 rounded-full ${statusColors[player.status] || 'bg-gray-100 text-gray-600'}">${player.status}</span>
+                                        ${player.isOrganiser ? '<span class="text-xs px-2 py-0.5 rounded-full bg-purple-100 text-purple-700">⭐ Organiser</span>' : ''}
                                     </div>
                                     <div class="text-sm text-gray-500 space-y-1">
                                         <div>📧 ${escapeHtml(player.email || '-')}</div>
@@ -726,6 +727,11 @@
                                         <div class="text-xs text-gray-400">Level</div>
                                         <div class="text-xl font-bold text-blue-600">${formatLevel(player.playtomicLevel)}</div>
                                     </div>
+                                    <button onclick="toggleOrganiser('${player.id}', ${!player.isOrganiser})" 
+                                        class="px-3 py-2 ${player.isOrganiser ? 'bg-purple-100 hover:bg-purple-200 text-purple-700' : 'bg-gray-100 hover:bg-gray-200 text-gray-700'} rounded-lg text-sm font-medium transition-colors"
+                                        title="${player.isOrganiser ? 'Remove organiser role' : 'Make organiser'}">
+                                        ${player.isOrganiser ? '⭐ Organiser' : '☆ Make Organiser'}
+                                    </button>
                                     <button onclick="showEditLevelModal('${player.id}', '${escapeHtml(player.name)}', ${player.playtomicLevel || 0})" 
                                         class="px-3 py-2 bg-gray-100 hover:bg-gray-200 text-gray-700 rounded-lg text-sm font-medium transition-colors">
                                         ✏️ Edit
@@ -757,6 +763,22 @@
                     </div>
                 `;
             }).join('');
+        }
+        
+        async function toggleOrganiser(playerId, makeOrganiser) {
+            try {
+                await database.ref(`${PLAYERS_DB_PATH}/${playerId}`).update({
+                    isOrganiser: makeOrganiser,
+                    organiserUpdatedAt: new Date().toISOString()
+                });
+                
+                showToast(makeOrganiser ? '⭐ Player is now an organiser!' : 'Organiser role removed');
+                loadPlayers();
+                
+            } catch (error) {
+                console.error('Error updating organiser status:', error);
+                showToast('❌ Failed to update');
+            }
         }
         
         function showVerifyModal(playerId, playerName, playtomicUsername) {
