@@ -987,6 +987,16 @@
                     'completed': 'bg-gray-100 text-gray-600'
                 };
                 
+                // Determine minimum players for each format
+                const minPlayersForFormat = {
+                    'americano': 4,
+                    'mexicano': 4,
+                    'mix': 20,
+                    'team-league': 8
+                };
+                const minPlayers = minPlayersForFormat[meta.format] || 4;
+                const canStartTournament = registeredCount >= minPlayers && meta.status !== 'active' && meta.status !== 'completed';
+                
                 return `
                     <div class="bg-white rounded-xl shadow-sm border border-gray-200 p-5">
                         <div class="flex flex-col md:flex-row md:items-center gap-4">
@@ -1001,12 +1011,29 @@
                                     <span>👥 ${registeredCount}/${meta.maxPlayers}</span>
                                     <span class="uppercase">${meta.format || 'tournament'}</span>
                                 </div>
+                                ${meta.tournamentId ? `
+                                    <div class="mt-2">
+                                        <a href="${getTournamentUrl(meta.format, meta.tournamentId, meta.organiserKey)}" target="_blank" 
+                                            class="text-blue-600 hover:underline text-sm font-medium">
+                                            🔗 View Tournament →
+                                        </a>
+                                    </div>
+                                ` : ''}
                             </div>
                             
-                            <div class="flex gap-2">
+                            <div class="flex flex-wrap gap-2">
                                 <button onclick="viewCompetitionPlayers('${comp.id}')" class="px-3 py-2 bg-gray-100 hover:bg-gray-200 text-gray-700 rounded-lg text-sm font-medium">
                                     👥 Players
                                 </button>
+                                ${canStartTournament ? `
+                                    <button onclick="showStartTournamentModal('${comp.id}')" class="px-3 py-2 bg-green-600 hover:bg-green-700 text-white rounded-lg text-sm font-medium">
+                                        🚀 Start Tournament
+                                    </button>
+                                ` : registeredCount < minPlayers && meta.status !== 'active' && meta.status !== 'completed' ? `
+                                    <span class="px-3 py-2 bg-gray-100 text-gray-400 rounded-lg text-sm" title="Need at least ${minPlayers} players">
+                                        🚀 Need ${minPlayers - registeredCount} more
+                                    </span>
+                                ` : ''}
                                 <select onchange="updateCompetitionStatus('${comp.id}', this.value)" class="px-3 py-2 border border-gray-200 rounded-lg text-sm">
                                     <option value="registration" ${meta.status === 'registration' ? 'selected' : ''}>Open</option>
                                     <option value="closed" ${meta.status === 'closed' ? 'selected' : ''}>Closed</option>
@@ -1253,6 +1280,433 @@
                 console.error('Error removing player:', error);
                 showToast('❌ Failed to remove player');
             }
+        }
+        
+        // ===== TOURNAMENT CREATION FUNCTIONS =====
+        
+        const TOURNAMENT_PATHS = {
+            'americano': 'americano-tournaments',
+            'mexicano': 'mexicano-tournaments',
+            'mix': 'tournaments',
+            'team-league': 'team-tournaments'
+        };
+        
+        const TOURNAMENT_URLS = {
+            'americano': '/americano/',
+            'mexicano': '/mexicano/',
+            'mix': '/tournament/',
+            'team-league': '/team-league/'
+        };
+        
+        function getTournamentUrl(format, tournamentId, organiserKey) {
+            const baseUrl = TOURNAMENT_URLS[format] || '/';
+            if (organiserKey) {
+                return `${baseUrl}?id=${tournamentId}&key=${organiserKey}`;
+            }
+            return `${baseUrl}?id=${tournamentId}`;
+        }
+        
+        function generateTournamentId() {
+            const chars = 'abcdefghijklmnopqrstuvwxyz0123456789';
+            let id = '';
+            for (let i = 0; i < 6; i++) {
+                id += chars.charAt(Math.floor(Math.random() * chars.length));
+            }
+            return id;
+        }
+        
+        function generateOrganiserKey() {
+            const chars = 'abcdefghijklmnopqrstuvwxyz0123456789';
+            let key = '';
+            for (let i = 0; i < 12; i++) {
+                key += chars.charAt(Math.floor(Math.random() * chars.length));
+            }
+            return key;
+        }
+        
+        function showStartTournamentModal(competitionId) {
+            const comp = allCompetitions.find(c => c.id === competitionId);
+            if (!comp) return;
+            
+            const players = comp.registeredPlayers || {};
+            const playerList = Object.entries(players);
+            const format = comp.meta.format;
+            
+            const formatInfo = {
+                'americano': { name: 'Americano', minPlayers: 4, maxPlayers: 24, courts: true },
+                'mexicano': { name: 'Mexicano', minPlayers: 4, maxPlayers: 24, courts: false },
+                'mix': { name: 'Mix Tournament', minPlayers: 20, maxPlayers: 28, courts: false },
+                'team-league': { name: 'Team League', minPlayers: 8, maxPlayers: 32, courts: false }
+            };
+            
+            const info = formatInfo[format] || formatInfo['americano'];
+            
+            const modal = document.createElement('div');
+            modal.id = 'start-tournament-modal';
+            modal.className = 'fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4 overflow-y-auto';
+            modal.innerHTML = `
+                <div class="bg-white rounded-2xl shadow-2xl max-w-lg w-full my-8">
+                    <div class="bg-gradient-to-r from-green-600 to-emerald-600 px-6 py-4 rounded-t-2xl">
+                        <h3 class="text-xl font-bold text-white">🚀 Start ${info.name}</h3>
+                    </div>
+                    <div class="p-6">
+                        <div class="bg-gray-50 rounded-xl p-4 mb-4">
+                            <div class="font-semibold text-gray-800 mb-1">${escapeHtml(comp.meta.name)}</div>
+                            <div class="text-sm text-gray-500">${playerList.length} players registered</div>
+                        </div>
+                        
+                        <div class="mb-4">
+                            <label class="block text-sm font-semibold text-gray-700 mb-2">Tournament Passcode *</label>
+                            <input type="text" id="tournament-passcode" 
+                                class="w-full px-4 py-3 border-2 border-gray-200 rounded-xl focus:border-green-500 focus:outline-none"
+                                placeholder="Enter passcode for organisers" maxlength="20" />
+                            <p class="text-xs text-gray-500 mt-1">Organisers will need this to manage the tournament</p>
+                        </div>
+                        
+                        ${info.courts ? `
+                            <div class="mb-4">
+                                <label class="block text-sm font-semibold text-gray-700 mb-2">Number of Courts</label>
+                                <select id="tournament-courts" class="w-full px-4 py-3 border-2 border-gray-200 rounded-xl focus:border-green-500 focus:outline-none">
+                                    <option value="1">1 Court</option>
+                                    <option value="2" selected>2 Courts</option>
+                                    <option value="3">3 Courts</option>
+                                    <option value="4">4 Courts</option>
+                                </select>
+                            </div>
+                        ` : ''}
+                        
+                        <div class="bg-blue-50 border border-blue-200 rounded-xl p-4 mb-4">
+                            <div class="flex gap-3">
+                                <span class="text-xl">ℹ️</span>
+                                <div class="text-sm text-blue-800">
+                                    <p class="font-semibold mb-1">What happens next:</p>
+                                    <ol class="list-decimal list-inside space-y-1 text-blue-700">
+                                        <li>A new ${info.name} tournament will be created</li>
+                                        <li>All ${playerList.length} registered players will be added</li>
+                                        <li>You'll get organiser and player links to share</li>
+                                        <li>Competition status will change to "Active"</li>
+                                    </ol>
+                                </div>
+                            </div>
+                        </div>
+                        
+                        <div class="mb-4">
+                            <label class="block text-sm font-semibold text-gray-700 mb-2">Players (${playerList.length})</label>
+                            <div class="max-h-40 overflow-y-auto bg-gray-50 rounded-xl p-3">
+                                ${playerList.map(([id, data], i) => `
+                                    <div class="flex items-center gap-2 py-1 ${i > 0 ? 'border-t border-gray-200' : ''}">
+                                        <span class="w-6 h-6 bg-green-100 text-green-700 rounded-full flex items-center justify-center text-xs font-bold">${i + 1}</span>
+                                        <span class="text-sm text-gray-700">${escapeHtml(data.name)}</span>
+                                        <span class="text-xs text-gray-400 ml-auto">Lvl ${formatLevel(data.level)}</span>
+                                    </div>
+                                `).join('')}
+                            </div>
+                        </div>
+                        
+                        <div class="flex gap-3">
+                            <button onclick="closeStartTournamentModal()" class="flex-1 py-3 bg-gray-100 hover:bg-gray-200 text-gray-700 rounded-xl font-medium">
+                                Cancel
+                            </button>
+                            <button onclick="createTournamentFromCompetition('${competitionId}')" class="flex-1 py-3 bg-green-600 hover:bg-green-700 text-white rounded-xl font-semibold">
+                                Create Tournament
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            `;
+            document.body.appendChild(modal);
+            
+            modal.addEventListener('click', (e) => {
+                if (e.target === modal) closeStartTournamentModal();
+            });
+            
+            setTimeout(() => document.getElementById('tournament-passcode')?.focus(), 100);
+        }
+        
+        function closeStartTournamentModal() {
+            const modal = document.getElementById('start-tournament-modal');
+            if (modal) modal.remove();
+        }
+        
+        async function createTournamentFromCompetition(competitionId) {
+            const passcode = document.getElementById('tournament-passcode')?.value.trim();
+            if (!passcode) {
+                showToast('❌ Please enter a passcode');
+                return;
+            }
+            
+            const comp = allCompetitions.find(c => c.id === competitionId);
+            if (!comp) {
+                showToast('❌ Competition not found');
+                return;
+            }
+            
+            const format = comp.meta.format;
+            const players = comp.registeredPlayers || {};
+            const playerList = Object.entries(players);
+            const courtCount = parseInt(document.getElementById('tournament-courts')?.value || '2');
+            
+            try {
+                let result;
+                
+                switch (format) {
+                    case 'americano':
+                        result = await createAmericanoTournament(comp, playerList, passcode, courtCount);
+                        break;
+                    case 'mexicano':
+                        result = await createMexicanoTournament(comp, playerList, passcode);
+                        break;
+                    case 'mix':
+                        result = await createMixTournament(comp, playerList, passcode);
+                        break;
+                    case 'team-league':
+                        result = await createTeamLeagueTournament(comp, playerList, passcode);
+                        break;
+                    default:
+                        showToast('❌ Unknown format');
+                        return;
+                }
+                
+                // Update competition with tournament link
+                await database.ref(`${COMPETITIONS_DB_PATH}/${competitionId}/meta`).update({
+                    status: 'active',
+                    tournamentId: result.tournamentId,
+                    organiserKey: result.organiserKey,
+                    tournamentCreatedAt: new Date().toISOString()
+                });
+                
+                closeStartTournamentModal();
+                showTournamentSuccessModal(format, result.tournamentId, result.organiserKey, comp.meta.name);
+                loadCompetitions();
+                
+            } catch (error) {
+                console.error('Error creating tournament:', error);
+                showToast('❌ Failed to create tournament');
+            }
+        }
+        
+        async function createAmericanoTournament(comp, playerList, passcode, courtCount) {
+            const tournamentId = generateTournamentId();
+            const organiserKey = generateOrganiserKey();
+            const hashedPasscode = btoa(passcode);
+            const playerCount = playerList.length;
+            
+            // Generate player names object
+            const playerNames = {};
+            playerList.forEach(([id, data], index) => {
+                playerNames[index] = data.name;
+            });
+            
+            // Generate court names
+            const courtNames = {};
+            for (let i = 0; i < courtCount; i++) {
+                courtNames[i] = `Court ${i + 1}`;
+            }
+            
+            // Initialize empty scores
+            const scores = {};
+            
+            const data = {
+                meta: {
+                    name: comp.meta.name,
+                    organiserKey,
+                    passcodeHash: hashedPasscode,
+                    createdAt: new Date().toISOString(),
+                    updatedAt: new Date().toISOString(),
+                    createdFromCompetition: comp.id
+                },
+                playerCount,
+                playerNames,
+                courtCount,
+                courtNames,
+                fixedPoints: false,
+                totalPoints: 32,
+                scores,
+                tournamentStarted: true
+            };
+            
+            await database.ref(`${TOURNAMENT_PATHS['americano']}/${tournamentId}`).set(data);
+            return { tournamentId, organiserKey };
+        }
+        
+        async function createMexicanoTournament(comp, playerList, passcode) {
+            const tournamentId = generateTournamentId();
+            const organiserKey = generateOrganiserKey();
+            const hashedPasscode = btoa(passcode);
+            
+            // Generate players array
+            const players = playerList.map(([id, data]) => ({
+                name: data.name,
+                points: 0,
+                wins: 0,
+                losses: 0,
+                gamesWon: 0,
+                gamesLost: 0
+            }));
+            
+            const data = {
+                meta: {
+                    name: comp.meta.name,
+                    mode: 'individual',
+                    pointsPerMatch: 32,
+                    createdAt: new Date().toISOString(),
+                    updatedAt: new Date().toISOString(),
+                    status: 'active',
+                    organiserKey,
+                    passcodeHash: hashedPasscode,
+                    createdFromCompetition: comp.id
+                },
+                currentRound: 0,
+                playerCount: players.length,
+                players,
+                rounds: []
+            };
+            
+            await database.ref(`${TOURNAMENT_PATHS['mexicano']}/${tournamentId}`).set(data);
+            return { tournamentId, organiserKey };
+        }
+        
+        async function createMixTournament(comp, playerList, passcode) {
+            const tournamentId = generateTournamentId();
+            const organiserKey = generateOrganiserKey();
+            const hashedPasscode = btoa(passcode);
+            
+            // Generate players object (Mix format uses different structure)
+            const players = {};
+            playerList.forEach(([id, data], index) => {
+                players[index + 1] = { name: data.name };
+            });
+            
+            const data = {
+                meta: {
+                    name: comp.meta.name,
+                    organiserKey,
+                    passcodeHash: hashedPasscode,
+                    createdAt: new Date().toISOString(),
+                    updatedAt: new Date().toISOString(),
+                    createdFromCompetition: comp.id
+                },
+                players
+            };
+            
+            await database.ref(`${TOURNAMENT_PATHS['mix']}/${tournamentId}`).set(data);
+            return { tournamentId, organiserKey };
+        }
+        
+        async function createTeamLeagueTournament(comp, playerList, passcode) {
+            const tournamentId = generateTournamentId();
+            const organiserKey = generateOrganiserKey();
+            const hashedPasscode = btoa(passcode);
+            
+            // For team league, we need to pair players into teams
+            // For now, we'll create placeholder teams
+            const teams = [];
+            for (let i = 0; i < playerList.length; i += 2) {
+                const player1 = playerList[i]?.[1]?.name || `Player ${i + 1}`;
+                const player2 = playerList[i + 1]?.[1]?.name || `Player ${i + 2}`;
+                teams.push({
+                    name: `Team ${Math.floor(i / 2) + 1}`,
+                    player1,
+                    player2,
+                    points: 0,
+                    gamesWon: 0,
+                    gamesLost: 0
+                });
+            }
+            
+            const data = {
+                meta: {
+                    name: comp.meta.name,
+                    organiserKey,
+                    passcodeHash: hashedPasscode,
+                    createdAt: new Date().toISOString(),
+                    updatedAt: new Date().toISOString(),
+                    createdFromCompetition: comp.id
+                },
+                teams,
+                currentWeek: 1,
+                status: 'setup'
+            };
+            
+            await database.ref(`${TOURNAMENT_PATHS['team-league']}/${tournamentId}`).set(data);
+            return { tournamentId, organiserKey };
+        }
+        
+        function showTournamentSuccessModal(format, tournamentId, organiserKey, competitionName) {
+            const playerLink = window.location.origin + getTournamentUrl(format, tournamentId, null);
+            const organiserLink = window.location.origin + getTournamentUrl(format, tournamentId, organiserKey);
+            
+            const modal = document.createElement('div');
+            modal.id = 'tournament-success-modal';
+            modal.className = 'fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4';
+            modal.innerHTML = `
+                <div class="bg-white rounded-2xl shadow-2xl max-w-lg w-full">
+                    <div class="bg-gradient-to-r from-green-500 to-emerald-500 px-6 py-4 rounded-t-2xl">
+                        <h3 class="text-xl font-bold text-white">🎉 Tournament Created!</h3>
+                    </div>
+                    <div class="p-6">
+                        <div class="text-center mb-6">
+                            <div class="text-6xl mb-4">✅</div>
+                            <p class="text-gray-600">${escapeHtml(competitionName)} is ready!</p>
+                        </div>
+                        
+                        <div class="space-y-4 mb-6">
+                            <div class="bg-blue-50 rounded-xl p-4">
+                                <div class="text-sm font-semibold text-blue-800 mb-2">📋 Tournament Code</div>
+                                <div class="font-mono text-2xl font-bold text-blue-600 tracking-wider">${tournamentId.toUpperCase()}</div>
+                            </div>
+                            
+                            <div class="bg-gray-50 rounded-xl p-4">
+                                <div class="text-sm font-semibold text-gray-700 mb-2">👥 Player Link (share with players)</div>
+                                <div class="flex gap-2">
+                                    <input type="text" readonly value="${playerLink}" 
+                                        class="flex-1 px-3 py-2 bg-white border border-gray-200 rounded-lg text-sm" id="player-link-input" />
+                                    <button onclick="copyToClipboard('${playerLink}', 'Player link copied!')" 
+                                        class="px-3 py-2 bg-blue-100 hover:bg-blue-200 text-blue-700 rounded-lg text-sm font-medium">
+                                        📋 Copy
+                                    </button>
+                                </div>
+                            </div>
+                            
+                            <div class="bg-amber-50 rounded-xl p-4">
+                                <div class="text-sm font-semibold text-amber-700 mb-2">🔑 Organiser Link (keep private)</div>
+                                <div class="flex gap-2">
+                                    <input type="text" readonly value="${organiserLink}" 
+                                        class="flex-1 px-3 py-2 bg-white border border-gray-200 rounded-lg text-sm" id="organiser-link-input" />
+                                    <button onclick="copyToClipboard('${organiserLink}', 'Organiser link copied!')" 
+                                        class="px-3 py-2 bg-amber-100 hover:bg-amber-200 text-amber-700 rounded-lg text-sm font-medium">
+                                        📋 Copy
+                                    </button>
+                                </div>
+                            </div>
+                        </div>
+                        
+                        <div class="flex gap-3">
+                            <button onclick="closeTournamentSuccessModal()" class="flex-1 py-3 bg-gray-100 hover:bg-gray-200 text-gray-700 rounded-xl font-medium">
+                                Close
+                            </button>
+                            <a href="${organiserLink}" target="_blank" class="flex-1 py-3 bg-green-600 hover:bg-green-700 text-white rounded-xl font-semibold text-center">
+                                Open Tournament →
+                            </a>
+                        </div>
+                    </div>
+                </div>
+            `;
+            document.body.appendChild(modal);
+        }
+        
+        function closeTournamentSuccessModal() {
+            const modal = document.getElementById('tournament-success-modal');
+            if (modal) modal.remove();
+        }
+        
+        function copyToClipboard(text, message) {
+            navigator.clipboard.writeText(text).then(() => {
+                showToast(message || 'Copied!');
+            }).catch(err => {
+                console.error('Copy failed:', err);
+                showToast('❌ Failed to copy');
+            });
         }
         
         // ===== UTILITY FUNCTIONS =====
