@@ -617,7 +617,7 @@
         
         // ===== PLAYER VERIFICATION FUNCTIONS =====
         
-        const PLAYERS_DB_PATH = 'players';
+        const PLAYERS_DB_PATH = 'users';  // Changed from 'players' to match new auth system
         const COMPETITIONS_DB_PATH = 'competitions';
         let allPlayers = [];
         let allCompetitions = [];
@@ -630,7 +630,10 @@
                 snapshot.forEach((child) => {
                     const player = child.val();
                     player.id = child.key;
-                    allPlayers.push(player);
+                    // Only include registered users, not guests
+                    if (player.type !== 'guest') {
+                        allPlayers.push(player);
+                    }
                 });
                 
                 // Sort by registration date (newest first)
@@ -694,26 +697,32 @@
                     'rejected': 'bg-red-100 text-red-700'
                 };
                 
+                const typeLabel = player.type === 'registered' ? '🔵 Google' : '👤 Legacy';
+                
                 return `
                     <div class="bg-white rounded-xl shadow-sm border border-gray-200 p-4">
                         <div class="flex flex-col md:flex-row md:items-center gap-4">
                             <!-- Player Info -->
                             <div class="flex items-center gap-4 flex-1">
-                                <div class="w-12 h-12 bg-gradient-to-br from-blue-500 to-purple-600 rounded-full flex items-center justify-center text-white font-bold text-lg flex-shrink-0">
-                                    ${player.name ? player.name.charAt(0).toUpperCase() : '?'}
-                                </div>
+                                ${player.photoURL ? 
+                                    `<img src="${player.photoURL}" alt="${escapeHtml(player.name)}" class="w-12 h-12 rounded-full flex-shrink-0 border-2 border-gray-200">` :
+                                    `<div class="w-12 h-12 bg-gradient-to-br from-blue-500 to-purple-600 rounded-full flex items-center justify-center text-white font-bold text-lg flex-shrink-0">
+                                        ${player.name ? player.name.charAt(0).toUpperCase() : '?'}
+                                    </div>`
+                                }
                                 <div class="flex-1 min-w-0">
-                                    <div class="flex items-center gap-2 mb-1">
+                                    <div class="flex items-center gap-2 mb-1 flex-wrap">
                                         <h3 class="font-semibold text-gray-800">${escapeHtml(player.name || 'Unknown')}</h3>
                                         <span class="text-xs px-2 py-0.5 rounded-full ${statusColors[player.status] || 'bg-gray-100 text-gray-600'}">${player.status}</span>
-                                        ${player.isOrganiser ? '<span class="text-xs px-2 py-0.5 rounded-full bg-purple-100 text-purple-700">⭐ Organiser</span>' : ''}
+                                        <span class="text-xs px-2 py-0.5 rounded-full bg-blue-50 text-blue-600">${typeLabel}</span>
+                                        ${player.isOrganiser ? '<span class="text-xs px-2 py-0.5 rounded-full bg-purple-100 text-purple-700">👑 Organiser</span>' : ''}
                                     </div>
                                     <div class="text-sm text-gray-500 space-y-1">
                                         <div>📧 ${escapeHtml(player.email || '-')}</div>
                                         <div class="flex items-center gap-2">
                                             <span>🎾 @${escapeHtml(player.playtomicUsername || '-')}</span>
-                                            <a href="https://www.playtomic.io/user/${encodeURIComponent(player.playtomicUsername)}" target="_blank" 
-                                                class="text-blue-600 hover:underline text-xs">[View Profile]</a>
+                                            ${player.playtomicUsername ? `<a href="https://www.playtomic.io/user/${encodeURIComponent(player.playtomicUsername)}" target="_blank" 
+                                                class="text-blue-600 hover:underline text-xs">[View Profile]</a>` : ''}
                                         </div>
                                         ${player.phone ? `<div>📱 ${escapeHtml(player.phone)}</div>` : ''}
                                     </div>
@@ -730,7 +739,7 @@
                                     <button onclick="toggleOrganiser('${player.id}', ${!player.isOrganiser})" 
                                         class="px-3 py-2 ${player.isOrganiser ? 'bg-purple-100 hover:bg-purple-200 text-purple-700' : 'bg-gray-100 hover:bg-gray-200 text-gray-700'} rounded-lg text-sm font-medium transition-colors"
                                         title="${player.isOrganiser ? 'Remove organiser role' : 'Make organiser'}">
-                                        ${player.isOrganiser ? '⭐ Organiser' : '☆ Make Organiser'}
+                                        ${player.isOrganiser ? '👑 Organiser' : '☆ Make Organiser'}
                                     </button>
                                     <button onclick="showEditLevelModal('${player.id}', '${escapeHtml(player.name)}', ${player.playtomicLevel || 0})" 
                                         class="px-3 py-2 bg-gray-100 hover:bg-gray-200 text-gray-700 rounded-lg text-sm font-medium transition-colors">
@@ -759,6 +768,7 @@
                             <span>ID: ${player.id}</span>
                             <span>Registered: ${formatDate(player.registeredAt)}</span>
                             ${player.verifiedAt ? `<span>Verified: ${formatDate(player.verifiedAt)}</span>` : ''}
+                            ${player.googleUid ? `<span class="text-blue-500">Google linked</span>` : ''}
                         </div>
                     </div>
                 `;
